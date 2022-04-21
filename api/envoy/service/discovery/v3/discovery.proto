@@ -19,6 +19,138 @@ option (udpa.annotations.file_status).package_version_status = ACTIVE;
 
 // [#protodoc-title: Common discovery API components]
 
+// A specification of a resource or resource(s) used when subscribing or
+// unsubscribing.
+// Note that in the case of a glob collection, one ResourceLocator may map
+// to more than one ResourceName.
+message ResourceLocator {
+  // The resource name to subscribe to.
+  string name = 1;
+
+  // A set of dynamic parameters used to match against the dynamic parameter
+  // constraints on the resource. This allows clients to select between
+  // multiple variants of the same resource.
+  // TODO(roth): To be added as part of xRFC TP2.
+  //map<string, string> dynamic_parameters = 2;
+}
+
+// Specifies a concrete resource name.
+message ResourceName {
+  // The name of the resource.
+  string name = 1;
+
+  // Dynamic parameter constraints associated with this resource. To be used by
+  // client-side caches (including xDS proxies) when matching subscribed
+  // resource locators.
+  // TODO(roth): To be added as part of xRFC TP2.
+  //DynamicParameterConstraints dynamic_parameter_constraints = 2;
+}
+
+message Subscribe {
+  // Resource type.  May be omitted if only new-style resource names are
+  // used in resource_locator.
+  string type_url = 1;
+
+  // Resource locators to be subscribed to.
+  repeated ResourceLocator resource_locators = 2;
+
+  // In the first subscription request upon reconnect, this indicates
+  // the versions of each resource that the sender already has.
+  // The receiver may avoid re-sending these resources in that case.
+  message InitialResourceVersions {
+    ResourceName resource_name = 1;
+    string version = 2;
+  }
+  repeated InitialResourceVersions initial_resource_versions = 3;
+}
+
+message Unsubscribe {
+  // Resource type.  May be omitted if only new-style resource names are
+  // used in resource_locators.
+  string type_url = 1;
+
+  // Resource locators to be unsubscribed from.
+  repeated ResourceLocator resource_locators = 2;
+}
+
+message Publish {
+  // Optional nonce.  If present, the sender is requesting a Receipt to
+  // be sent back by the receiver with the same nonce indicating whether
+  // the client encountered any errors validating the resources.
+  // If absent, no receipt is necessary.
+  google.protobuf.String nonce = 1;
+
+  // The resources being published.
+  repeated Resource resources = 2;
+
+  // Indicates errors encountered by the publisher trying to provide
+  // the subscribed resources.
+  message PublicationError {
+    // The resource that the error is associated with.
+    //
+    // In the case where there is a problem mapping a subscribed
+    // ResourceLocator to a set of individual resources (e.g., a glob
+    // collection does not match any resources, or there is a permission
+    // problem trying to find a match), the resource_locator field will
+    // be used.
+    //
+    // In the case where there is a problem associated with an
+    // individual resource, the resource_name field will be used.
+    oneof resource_specifier {
+      ResourceLocator resource_locator = 1;
+      ResourceName resource_name = 2;
+    }
+
+    // If a resource does not exist, the status code will be NOT_FOUND.
+    google.rpc.Status error = 3;
+  }
+}
+
+message Receipt {
+  // The nonce from the Publish message with which this receipt is associated.
+  string nonce = 1;
+
+  // A NACK for an individual resource.
+  // Any resource name from the Publish message that is not listed here is
+  // considered valid.  If there are no nacks, then all resources in the
+  // Publish message were valid.
+  message Nack {
+    // The name of the resource.
+    ResourceName resource_name = 1;
+    // The version of the resource, from the Resource.version field.
+    string version = 2;
+    // The error message.
+    google.rpc.Status error = 3;
+  }
+  repeated Nack nacks = 2;
+}
+
+message XdsResourceExchangeRequest {
+  // Client node identification.
+  // Not required after the first request on a stream.
+  config.core.v3.Node node = 1;
+
+  oneof action {
+    Subscribe subscribe = 2;
+    Unsubscribe unsubscribe = 3;
+    Publish publish = 4;
+    Receipt receipt = 5;
+  }
+}
+
+message XdsResourceExchangeResponse {
+  // Control plane identification.
+  // Not required after the first request on a stream.
+  config.core.v3.ControlPlane control_plane = 1;
+
+  oneof action {
+    Subscribe subscribe = 2;
+    Unsubscribe unsubscribe = 3;
+    Publish publish = 4;
+    Receipt receipt = 5;
+  }
+}
+
 // A DiscoveryRequest requests a set of versioned resources of the same type for
 // a given Envoy node on some API.
 // [#next-free-field: 7]

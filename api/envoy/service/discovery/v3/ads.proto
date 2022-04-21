@@ -35,6 +35,10 @@ service AggregatedDiscoveryService {
   rpc DeltaAggregatedResources(stream DeltaDiscoveryRequest)
       returns (stream DeltaDiscoveryResponse) {
   }
+
+  rpc XdsResourceExchange(stream XdsResourceExchangeRequest)
+      returns (stream XdsResourceExchangeResponse) {
+  }
 }
 
 // [#not-implemented-hide:] Not configuration. Workaround c++ protobuf issue with importing
